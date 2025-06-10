@@ -362,6 +362,8 @@ function loadCountdowns() {
     // Clear current countdowns
     countdownsContainer.innerHTML = '<div class="loading">Loading countdowns...</div>';
     
+    console.log('Loading countdowns with filter:', currentFilter);
+    
     // Create and execute query
     let query = db.collection('countdowns');
     
@@ -378,8 +380,11 @@ function loadCountdowns() {
             
             if (querySnapshot.empty) {
                 countdownsContainer.innerHTML = '<div class="loading">No countdowns found.</div>';
+                console.log('No countdowns found');
                 return;
             }
+
+            console.log('Found', querySnapshot.size, 'countdowns');
 
             // Collect all countdowns with their calculated time remaining
             const countdownsWithTimeRemaining = [];
@@ -387,6 +392,8 @@ function loadCountdowns() {
             
             querySnapshot.forEach(doc => {
                 const countdown = doc.data();
+                console.log('Processing countdown:', countdown.name, 'Category:', countdown.category);
+                
                 let targetDateTime = countdown.date.toDate();
                 const repeatType = countdown.repeat || 'none';
                 
@@ -448,8 +455,18 @@ function loadCountdowns() {
                 });
             });
             
+            console.log('Before sorting:', countdownsWithTimeRemaining.map(item => ({
+                name: item.countdown.name, 
+                timeRemaining: Math.floor(item.timeRemaining / (1000 * 60 * 60 * 24)) + ' days'
+            })));
+            
             // Sort by time remaining (ascending - less time at the top)
             countdownsWithTimeRemaining.sort((a, b) => a.timeRemaining - b.timeRemaining);
+            
+            console.log('After sorting:', countdownsWithTimeRemaining.map(item => ({
+                name: item.countdown.name, 
+                timeRemaining: Math.floor(item.timeRemaining / (1000 * 60 * 60 * 24)) + ' days'
+            })));
             
             // Create and append countdown elements in the new sorted order
             countdownsWithTimeRemaining.forEach(item => {
@@ -461,6 +478,7 @@ function loadCountdowns() {
             startCountdowns();
         })
         .catch(error => {
+            console.error('Error loading countdowns:', error);
             countdownsContainer.innerHTML = `<div class="loading">Error loading countdowns: ${error.message}</div>`;
         });
 }
