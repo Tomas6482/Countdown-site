@@ -377,9 +377,15 @@ button[type="submit"]:active {
 }
 
 .admin-countdown-item .countdown-details p {
+    margin-bottom: 0.3rem;
     font-size: 0.9rem;
     color: #666;
-    margin-bottom: 0.2rem;
+}
+
+.admin-countdown-item .countdown-details p.time-remaining {
+    font-weight: bold;
+    color: var(--primary-color);
+    margin-top: 0.5rem;
 }
 
 .admin-countdown-item .action-buttons {

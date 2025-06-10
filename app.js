@@ -369,6 +369,7 @@ function loadCountdowns() {
         query = query.where('category', '==', currentFilter);
     }
     
+    // We still need to get the data sorted by date initially from Firestore
     query.orderBy('date')
         .get()
         .then(querySnapshot => {
@@ -379,10 +380,80 @@ function loadCountdowns() {
                 countdownsContainer.innerHTML = '<div class="loading">No countdowns found.</div>';
                 return;
             }
+
+            // Collect all countdowns with their calculated time remaining
+            const countdownsWithTimeRemaining = [];
+            const currentDate = new Date().getTime();
             
             querySnapshot.forEach(doc => {
                 const countdown = doc.data();
-                const countdownElement = createCountdownElement(doc.id, countdown);
+                let targetDateTime = countdown.date.toDate();
+                const repeatType = countdown.repeat || 'none';
+                
+                // Handle repeating events
+                if (repeatType !== 'none' && currentDate > targetDateTime.getTime()) {
+                    const originalDate = new Date(targetDateTime);
+                    
+                    switch(repeatType) {
+                        case 'daily':
+                            // Next occurrence today or tomorrow
+                            targetDateTime = new Date();
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setDate(targetDateTime.getDate() + 1);
+                            }
+                            break;
+                        
+                        case 'weekly':
+                            // Next occurrence this week or next week on the same day
+                            targetDateTime = new Date();
+                            targetDateTime.setDate(targetDateTime.getDate() + (originalDate.getDay() + 7 - targetDateTime.getDay()) % 7);
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setDate(targetDateTime.getDate() + 7);
+                            }
+                            break;
+                        
+                        case 'monthly':
+                            // Next occurrence this month or next month on the same day
+                            targetDateTime = new Date();
+                            targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(targetDateTime.getMonth(), targetDateTime.getFullYear())));
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setMonth(targetDateTime.getMonth() + 1);
+                                targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(targetDateTime.getMonth(), targetDateTime.getFullYear())));
+                            }
+                            break;
+                        
+                        case 'yearly':
+                            // Next occurrence this year or next year on the same month and day
+                            targetDateTime = new Date();
+                            targetDateTime.setMonth(originalDate.getMonth());
+                            targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(originalDate.getMonth(), targetDateTime.getFullYear())));
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setFullYear(targetDateTime.getFullYear() + 1);
+                            }
+                            break;
+                    }
+                }
+                
+                // Calculate time remaining
+                const timeRemaining = targetDateTime.getTime() - currentDate;
+                
+                countdownsWithTimeRemaining.push({
+                    id: doc.id,
+                    countdown: countdown,
+                    timeRemaining: timeRemaining > 0 ? timeRemaining : Infinity // Put expired non-repeating events at the end
+                });
+            });
+            
+            // Sort by time remaining (ascending - less time at the top)
+            countdownsWithTimeRemaining.sort((a, b) => a.timeRemaining - b.timeRemaining);
+            
+            // Create and append countdown elements in the new sorted order
+            countdownsWithTimeRemaining.forEach(item => {
+                const countdownElement = createCountdownElement(item.id, item.countdown);
                 countdownsContainer.appendChild(countdownElement);
             });
             
@@ -410,9 +481,80 @@ function loadAdminCountdowns() {
                 adminCountdownList.innerHTML = '<li class="loading">No countdowns found.</li>';
                 return;
             }
+
+            // Collect all countdowns with their calculated time remaining
+            const countdownsWithTimeRemaining = [];
+            const currentDate = new Date().getTime();
             
             querySnapshot.forEach(doc => {
                 const countdown = doc.data();
+                let targetDateTime = countdown.date.toDate();
+                const repeatType = countdown.repeat || 'none';
+                
+                // Handle repeating events
+                if (repeatType !== 'none' && currentDate > targetDateTime.getTime()) {
+                    const originalDate = new Date(targetDateTime);
+                    
+                    switch(repeatType) {
+                        case 'daily':
+                            // Next occurrence today or tomorrow
+                            targetDateTime = new Date();
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setDate(targetDateTime.getDate() + 1);
+                            }
+                            break;
+                        
+                        case 'weekly':
+                            // Next occurrence this week or next week on the same day
+                            targetDateTime = new Date();
+                            targetDateTime.setDate(targetDateTime.getDate() + (originalDate.getDay() + 7 - targetDateTime.getDay()) % 7);
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setDate(targetDateTime.getDate() + 7);
+                            }
+                            break;
+                        
+                        case 'monthly':
+                            // Next occurrence this month or next month on the same day
+                            targetDateTime = new Date();
+                            targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(targetDateTime.getMonth(), targetDateTime.getFullYear())));
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setMonth(targetDateTime.getMonth() + 1);
+                                targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(targetDateTime.getMonth(), targetDateTime.getFullYear())));
+                            }
+                            break;
+                        
+                        case 'yearly':
+                            // Next occurrence this year or next year on the same month and day
+                            targetDateTime = new Date();
+                            targetDateTime.setMonth(originalDate.getMonth());
+                            targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(originalDate.getMonth(), targetDateTime.getFullYear())));
+                            targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                            if (targetDateTime.getTime() < currentDate) {
+                                targetDateTime.setFullYear(targetDateTime.getFullYear() + 1);
+                            }
+                            break;
+                    }
+                }
+                
+                // Calculate time remaining
+                const timeRemaining = targetDateTime.getTime() - currentDate;
+                
+                countdownsWithTimeRemaining.push({
+                    id: doc.id,
+                    countdown: countdown,
+                    timeRemaining: timeRemaining > 0 ? timeRemaining : Infinity // Put expired non-repeating events at the end
+                });
+            });
+            
+            // Sort by time remaining (ascending - less time at the top)
+            countdownsWithTimeRemaining.sort((a, b) => a.timeRemaining - b.timeRemaining);
+            
+            // Create and append countdown elements in the new sorted order
+            countdownsWithTimeRemaining.forEach(item => {
+                const countdown = item.countdown;
                 const listItem = document.createElement('li');
                 listItem.className = 'admin-countdown-item';
                 
@@ -429,16 +571,23 @@ function loadAdminCountdowns() {
                     'monthly': 'Monthly',
                     'yearly': 'Yearly'
                 }[countdown.repeat] || 'No repeat';
+
+                // Calculate time remaining in days for display
+                const daysRemaining = Math.floor(item.timeRemaining / (1000 * 60 * 60 * 24));
+                const timeRemainingDisplay = item.timeRemaining < Infinity 
+                    ? `Time remaining: ${daysRemaining} days`
+                    : 'Event has passed';
                 
                 listItem.innerHTML = `
                     <div class="countdown-details">
                         <h4>${countdown.name}</h4>
                         <p>Date: ${dateString}</p>
                         <p>Category: ${categoryLabel} | Repeat: ${repeatLabel}</p>
+                        <p class="time-remaining">${timeRemainingDisplay}</p>
                     </div>
                     <div class="action-buttons">
-                        <button class="edit-btn" data-id="${doc.id}">Edit</button>
-                        <button class="delete-btn" data-id="${doc.id}">Delete</button>
+                        <button class="edit-btn" data-id="${item.id}">Edit</button>
+                        <button class="delete-btn" data-id="${item.id}">Delete</button>
                     </div>
                 `;
                 
