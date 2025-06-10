@@ -792,10 +792,68 @@ function createCountdownElement(id, countdown) {
         'yearly': 'Repeats Yearly'
     }[countdown.repeat] || '';
     
+    // Get the actual target date (adjusted for repeating events)
+    const currentDate = new Date().getTime();
+    let targetDateTime = new Date(dateObj);
+    const repeatType = countdown.repeat || 'none';
+    
+    // Handle repeating events - calculate the next occurrence
+    if (repeatType !== 'none' && currentDate > targetDateTime.getTime()) {
+        const originalDate = new Date(targetDateTime);
+        
+        switch(repeatType) {
+            case 'daily':
+                // Next occurrence today or tomorrow
+                targetDateTime = new Date();
+                targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                if (targetDateTime.getTime() < currentDate) {
+                    targetDateTime.setDate(targetDateTime.getDate() + 1);
+                }
+                break;
+            
+            case 'weekly':
+                // Next occurrence this week or next week on the same day
+                targetDateTime = new Date();
+                targetDateTime.setDate(targetDateTime.getDate() + (originalDate.getDay() + 7 - targetDateTime.getDay()) % 7);
+                targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                if (targetDateTime.getTime() < currentDate) {
+                    targetDateTime.setDate(targetDateTime.getDate() + 7);
+                }
+                break;
+            
+            case 'monthly':
+                // Next occurrence this month or next month on the same day
+                targetDateTime = new Date();
+                targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(targetDateTime.getMonth(), targetDateTime.getFullYear())));
+                targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                if (targetDateTime.getTime() < currentDate) {
+                    targetDateTime.setMonth(targetDateTime.getMonth() + 1);
+                    targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(targetDateTime.getMonth(), targetDateTime.getFullYear())));
+                }
+                break;
+            
+            case 'yearly':
+                // Next occurrence this year or next year on the same month and day
+                targetDateTime = new Date();
+                targetDateTime.setMonth(originalDate.getMonth());
+                targetDateTime.setDate(Math.min(originalDate.getDate(), getDaysInMonth(originalDate.getMonth(), targetDateTime.getFullYear())));
+                targetDateTime.setHours(originalDate.getHours(), originalDate.getMinutes(), originalDate.getSeconds(), 0);
+                if (targetDateTime.getTime() < currentDate) {
+                    targetDateTime.setFullYear(targetDateTime.getFullYear() + 1);
+                }
+                break;
+        }
+    }
+    
+    // Check if date is during summer break (July 1 - August 31)
+    const month = targetDateTime.getMonth(); // 0-indexed (6 = July, 7 = August)
+    const day = targetDateTime.getDate();
+    const isSummerBreak = (month === 6 || month === 7) || (month === 5 && day >= 24); // July, August, or after June 23
+    
     countdownCard.innerHTML = `
         <span class="countdown-category">${categoryLabel}</span>
         <h2 class="countdown-title">${countdown.name}</h2>
-        <div class="countdown-timer" data-target="${dateObj.getTime()}" data-repeat="${countdown.repeat}">
+        <div class="countdown-timer" data-target="${targetDateTime.getTime()}" data-repeat="${countdown.repeat}">
             <div class="countdown-segment">
                 <span class="number" id="days-${id}">--</span>
                 <span class="label">Days</span>
@@ -813,11 +871,165 @@ function createCountdownElement(id, countdown) {
                 <span class="label">Seconds</span>
             </div>
         </div>
-        <div class="countdown-date">${dateString}</div>
+        <div class="countdown-date">${targetDateTime.toLocaleString(undefined, {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        })}</div>
         ${repeatLabel ? `<div class="countdown-recurring">${repeatLabel}</div>` : ''}
+        ${!isSummerBreak ? `
+        <button class="school-info-toggle">Show School Days</button>
+        <div class="school-info-panel hidden">
+            <div class="school-info-item">
+                <h3>School Days Left</h3>
+                <div class="school-days-count" id="school-days-${id}">Calculating...</div>
+                <div class="school-info-desc">Only counting Mon-Fri</div>
+            </div>
+            <div class="school-info-item">
+                <h3>Days Until End of School</h3>
+                <div class="end-of-school-count" id="end-school-${id}">Calculating...</div>
+                <div class="school-info-desc">Until June 23rd</div>
+            </div>
+        </div>
+        ` : ''}
     `;
     
+    // Add click event to the toggle button if it exists
+    setTimeout(() => {
+        const toggleButton = countdownCard.querySelector('.school-info-toggle');
+        if (!toggleButton) return; // Skip if button doesn't exist (summer break)
+        
+        const infoPanel = countdownCard.querySelector('.school-info-panel');
+        
+        if (toggleButton && infoPanel) {
+            toggleButton.addEventListener('click', () => {
+                infoPanel.classList.toggle('hidden');
+                const isHidden = infoPanel.classList.contains('hidden');
+                toggleButton.textContent = isHidden ? 'Show School Days' : 'Hide School Days';
+                
+                // Toggle expanded class for browsers that don't support :has()
+                if (isHidden) {
+                    countdownCard.classList.remove('expanded');
+                } else {
+                    countdownCard.classList.add('expanded');
+                    calculateSchoolDays(id, targetDateTime);
+                }
+            });
+        }
+    }, 0);
+    
     return countdownCard;
+}
+
+// Calculate school days
+function calculateSchoolDays(id, targetDate) {
+    const schoolDaysElement = document.getElementById(`school-days-${id}`);
+    const endSchoolElement = document.getElementById(`end-school-${id}`);
+    
+    if (!schoolDaysElement || !endSchoolElement) return;
+    
+    // Get current date and check if it's past 12:30 PM
+    const now = new Date();
+    const isPastSchoolDay = now.getHours() > 12 || (now.getHours() === 12 && now.getMinutes() >= 30);
+    
+    // Start counting from today or tomorrow based on time
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // If it's past 12:30 PM, start counting from tomorrow
+    const startDate = new Date(today);
+    if (isPastSchoolDay) {
+        startDate.setDate(startDate.getDate() + 1);
+    }
+    
+    // Calculate school days (Monday-Friday) until the target date
+    let schoolDays = 0;
+    const tempDate = new Date(startDate);
+    
+    // Check if the target date is before June 24th of the same year as the target date
+    const targetYear = targetDate.getFullYear();
+    const endOfSchoolDate = new Date(targetYear, 5, 23, 23, 59, 59, 999); // June 23rd
+    
+    // Only calculate school days if the target date is before the end of school in that year
+    // or if we're currently before the end of school in the current year
+    if (targetDate <= endOfSchoolDate || today <= endOfSchoolDate) {
+        while (tempDate <= targetDate) {
+            // Check if the date is within summer break (July 1 - August 31)
+            const month = tempDate.getMonth(); // 0-indexed (6 = July, 7 = August)
+            const day = tempDate.getDate();
+            
+            // Skip any dates from previous summer (if applicable)
+            const isInSummerBreak = (month === 6 || month === 7) || // July or August
+                                   (month === 5 && day > 23);  // After June 23rd
+            
+            const dayOfWeek = tempDate.getDay();
+            // Only count weekdays (Mon-Fri) and not during summer break
+            if (dayOfWeek >= 1 && dayOfWeek <= 5 && !isInSummerBreak) {
+                schoolDays++;
+            }
+            
+            tempDate.setDate(tempDate.getDate() + 1);
+        }
+    }
+    
+    // Calculate days until end of school (June 23rd of current or next year)
+    const currentYear = today.getFullYear();
+    let currentEndOfSchoolDate = new Date(currentYear, 5, 23); // June 23rd (month is 0-indexed)
+    currentEndOfSchoolDate.setHours(23, 59, 59, 999); // Set to end of day
+    
+    // If we've passed this year's end date, use next year's
+    if (today > currentEndOfSchoolDate) {
+        currentEndOfSchoolDate = new Date(currentYear + 1, 5, 23);
+        currentEndOfSchoolDate.setHours(23, 59, 59, 999);
+    }
+    
+    const endOfSchoolDays = Math.ceil((currentEndOfSchoolDate - startDate) / (1000 * 60 * 60 * 24));
+    
+    // Calculate school days until end of school
+    let schoolDaysUntilEnd = 0;
+    const tempEndDate = new Date(startDate);
+    
+    while (tempEndDate <= currentEndOfSchoolDate) {
+        const dayOfWeek = tempEndDate.getDay();
+        // Only count weekdays (Mon-Fri)
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+            // Skip any dates that are in summer break from previous years
+            const month = tempEndDate.getMonth();
+            const day = tempEndDate.getDate();
+            const isInSummerBreak = (month === 6 || month === 7); // July or August
+            
+            if (!isInSummerBreak) {
+                schoolDaysUntilEnd++;
+            }
+        }
+        
+        tempEndDate.setDate(tempEndDate.getDate() + 1);
+    }
+    
+    // Update the elements
+    schoolDaysElement.textContent = schoolDays;
+    endSchoolElement.innerHTML = `${endOfSchoolDays} days<br><span class="school-days-subset">(${schoolDaysUntilEnd} school days)</span>`;
+    
+    // Add a note about today if it's past 12:30
+    let noteText = 'Only counting Mon-Fri';
+    if (isPastSchoolDay) {
+        noteText = `<span class="today-note">(Today not counted - past 12:30)</span>`;
+    }
+    
+    // Add note about summer break
+    const schoolInfoDesc = schoolDaysElement.closest('.school-info-item').querySelector('.school-info-desc');
+    if (schoolInfoDesc) {
+        schoolInfoDesc.innerHTML = noteText;
+    }
+    
+    // Add note about summer break to the End of School section
+    const endSchoolDesc = endSchoolElement.closest('.school-info-item').querySelector('.school-info-desc');
+    if (endSchoolDesc) {
+        endSchoolDesc.innerHTML = 'Until June 23rd<br><span class="note">(Summer break: Jul 1 - Aug 31)</span>';
+    }
 }
 
 // Start all countdown timers
