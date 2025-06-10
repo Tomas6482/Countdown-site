@@ -6,6 +6,9 @@ const countdownManagement = document.getElementById('countdown-management');
 const loginForm = document.getElementById('login-form');
 const countdownForm = document.getElementById('countdown-form');
 const adminCountdownList = document.getElementById('admin-countdown-list');
+const firebaseIndicator = document.getElementById('firebase-indicator');
+const firebaseStatusText = document.getElementById('firebase-status-text');
+const logoutBtn = document.getElementById('logout-btn');
 
 // Navigation buttons
 const allBtn = document.getElementById('all-btn');
@@ -21,14 +24,71 @@ let isAdminLoggedIn = false;
 // The admin password - change this to your desired password
 const ADMIN_PASSWORD = "admin123";
 
-// Check if there's a stored login state
-if(localStorage.getItem('isAdminLoggedIn') === 'true') {
-    isAdminLoggedIn = true;
-    loginSection.classList.add('hidden');
-    countdownManagement.classList.remove('hidden');
-    // Load admin countdowns when admin panel is opened
-    adminBtn.addEventListener('click', loadAdminCountdowns);
+// Firebase connection monitoring
+function monitorFirebaseConnection() {
+    // Get the Firestore database connection state
+    const connectedRef = firebase.database().ref('.info/connected');
+    connectedRef.on('value', (snap) => {
+        if (snap.val() === true) {
+            // Connected to Firebase
+            firebaseIndicator.classList.add('connected');
+            firebaseIndicator.classList.remove('disconnected');
+            firebaseStatusText.textContent = 'Connected to Firebase';
+        } else {
+            // Not connected to Firebase
+            firebaseIndicator.classList.remove('connected');
+            firebaseIndicator.classList.add('disconnected');
+            firebaseStatusText.textContent = 'Disconnected from Firebase';
+        }
+    });
 }
+
+// Set current date and time in the form
+function setCurrentDateTime() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    const dateTimeValue = `${year}-${month}-${day}T${hours}:${minutes}`;
+    document.getElementById('event-date').value = dateTimeValue;
+}
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', () => {
+    // Monitor Firebase connection
+    try {
+        monitorFirebaseConnection();
+    } catch (error) {
+        console.error('Firebase Realtime Database not initialized:', error);
+        firebaseIndicator.classList.add('disconnected');
+        firebaseStatusText.textContent = 'Firebase connection issue';
+    }
+    
+    // Set current date/time in form when admin panel is opened
+    adminBtn.addEventListener('click', () => {
+        setCurrentDateTime();
+    });
+    
+    // Use the logout button from HTML instead of creating one in JS
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', logoutAdmin);
+    }
+    
+    // Check if there's a stored login state
+    if(localStorage.getItem('isAdminLoggedIn') === 'true') {
+        isAdminLoggedIn = true;
+        loginSection.classList.add('hidden');
+        countdownManagement.classList.remove('hidden');
+        // Load admin countdowns
+        loadAdminCountdowns();
+    }
+    
+    // Load all countdowns by default
+    loadCountdowns();
+});
 
 // Login form submission
 loginForm.addEventListener('submit', e => {
@@ -44,6 +104,9 @@ loginForm.addEventListener('submit', e => {
         // Show admin panel
         loginSection.classList.add('hidden');
         countdownManagement.classList.remove('hidden');
+        
+        // Set current date/time
+        setCurrentDateTime();
         
         // Load admin countdowns
         loadAdminCountdowns();
@@ -62,13 +125,6 @@ function logoutAdmin() {
     loginSection.classList.remove('hidden');
     countdownManagement.classList.add('hidden');
 }
-
-// Add logout button to admin panel
-const logoutButton = document.createElement('button');
-logoutButton.textContent = 'Logout';
-logoutButton.className = 'logout-btn';
-logoutButton.addEventListener('click', logoutAdmin);
-countdownManagement.insertBefore(logoutButton, countdownManagement.firstChild);
 
 // Countdown form submission (add new countdown)
 countdownForm.addEventListener('submit', e => {
@@ -93,6 +149,8 @@ countdownForm.addEventListener('submit', e => {
         // Clear form
         countdownForm.reset();
         document.getElementById('event-color').value = '#4287f5';
+        // Reset the date/time to current
+        setCurrentDateTime();
         alert('Countdown added successfully!');
         
         // Refresh admin countdown list

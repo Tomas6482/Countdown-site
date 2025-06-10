@@ -9,6 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
 <body>
     <header>
@@ -28,32 +29,65 @@
         </div>
 
         <div id="admin-panel" class="hidden">
+            <div class="firebase-status">
+                <div class="status-indicator" id="firebase-indicator"></div>
+                <span id="firebase-status-text">Checking connection...</span>
+            </div>
+            
             <div id="login-section">
                 <h2>Admin Login</h2>
                 <form id="login-form">
-                    <input type="password" id="password" placeholder="Admin Password" required>
+                    <div class="form-group">
+                        <label for="password">Admin Password</label>
+                        <input type="password" id="password" placeholder="Enter admin password" required>
+                    </div>
                     <button type="submit">Login</button>
                 </form>
             </div>
 
             <div id="countdown-management" class="hidden">
-                <h2>Manage Countdowns</h2>
+                <div class="admin-header">
+                    <h2>Manage Countdowns</h2>
+                    <button class="logout-btn" id="logout-btn">Logout</button>
+                </div>
+                
                 <form id="countdown-form">
-                    <input type="text" id="event-name" placeholder="Event Name" required>
-                    <input type="datetime-local" id="event-date" required>
-                    <select id="event-category" required>
-                        <option value="">Select Category</option>
-                        <option value="holidays">Holiday</option>
-                        <option value="games">Game Event</option>
-                    </select>
-                    <select id="event-repeat" required>
-                        <option value="none">No Repeat</option>
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="yearly">Yearly</option>
-                    </select>
-                    <input type="color" id="event-color" value="#4287f5">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-name">Event Name</label>
+                            <input type="text" id="event-name" placeholder="Enter event name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-date">Event Date & Time</label>
+                            <input type="datetime-local" id="event-date" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-category">Category</label>
+                            <select id="event-category" required>
+                                <option value="">Select Category</option>
+                                <option value="holidays">Holiday</option>
+                                <option value="games">Game Event</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-repeat">Repeat</label>
+                            <select id="event-repeat" required>
+                                <option value="none">No Repeat</option>
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="event-color">Color</label>
+                            <input type="color" id="event-color" value="#4287f5">
+                        </div>
+                    </div>
+                    
                     <button type="submit">Add Countdown</button>
                 </form>
 
