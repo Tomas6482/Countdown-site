@@ -21,26 +21,82 @@ let currentFilter = 'all';
 // Admin state
 let isAdminLoggedIn = false;
 
-// The admin password - change this to your desired password
-const ADMIN_PASSWORD = "admin123";
+// Default password (only used if Firebase fetch fails)
+const DEFAULT_PASSWORD = "admin123";
+let adminPassword = DEFAULT_PASSWORD;
+
+// Fetch the admin password from Firebase
+function fetchAdminPassword() {
+    return db.collection('admin').doc('settings').get()
+        .then(doc => {
+            if (doc.exists && doc.data().password) {
+                adminPassword = doc.data().password;
+                console.log('Admin password loaded from Firebase');
+                return true;
+            } else {
+                // If no password is set in Firebase, create one with the default
+                return db.collection('admin').doc('settings').set({
+                    password: DEFAULT_PASSWORD
+                })
+                .then(() => {
+                    console.log('Default admin password saved to Firebase');
+                    return true;
+                })
+                .catch(error => {
+                    console.error('Error setting default password:', error);
+                    return false;
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching admin password:', error);
+            return false;
+        });
+}
+
+// Simple connection status update using Firestore
+// (fallback if Realtime Database isn't set up yet)
+function updateConnectionStatus() {
+    db.collection('system').doc('status').set({
+        lastCheck: firebase.firestore.FieldValue.serverTimestamp()
+    })
+    .then(() => {
+        firebaseIndicator.classList.add('connected');
+        firebaseIndicator.classList.remove('disconnected');
+        firebaseStatusText.textContent = 'Connected to Firebase';
+    })
+    .catch(() => {
+        firebaseIndicator.classList.remove('connected');
+        firebaseIndicator.classList.add('disconnected');
+        firebaseStatusText.textContent = 'Disconnected from Firebase';
+    });
+}
 
 // Firebase connection monitoring
 function monitorFirebaseConnection() {
-    // Get the Firestore database connection state
-    const connectedRef = firebase.database().ref('.info/connected');
-    connectedRef.on('value', (snap) => {
-        if (snap.val() === true) {
-            // Connected to Firebase
-            firebaseIndicator.classList.add('connected');
-            firebaseIndicator.classList.remove('disconnected');
-            firebaseStatusText.textContent = 'Connected to Firebase';
-        } else {
-            // Not connected to Firebase
-            firebaseIndicator.classList.remove('connected');
-            firebaseIndicator.classList.add('disconnected');
-            firebaseStatusText.textContent = 'Disconnected from Firebase';
-        }
-    });
+    try {
+        // Try using Realtime Database if available
+        const connectedRef = firebase.database().ref('.info/connected');
+        connectedRef.on('value', (snap) => {
+            if (snap.val() === true) {
+                // Connected to Firebase
+                firebaseIndicator.classList.add('connected');
+                firebaseIndicator.classList.remove('disconnected');
+                firebaseStatusText.textContent = 'Connected to Firebase';
+            } else {
+                // Not connected to Firebase
+                firebaseIndicator.classList.remove('connected');
+                firebaseIndicator.classList.add('disconnected');
+                firebaseStatusText.textContent = 'Disconnected from Firebase';
+            }
+        });
+    } catch (error) {
+        console.error('Firebase Realtime Database not initialized:', error);
+        // Fall back to Firestore for connection status
+        updateConnectionStatus();
+        // Set interval to check connection periodically
+        setInterval(updateConnectionStatus, 30000);
+    }
 }
 
 // Set current date and time in the form
@@ -59,13 +115,10 @@ function setCurrentDateTime() {
 // Initialize the app
 document.addEventListener('DOMContentLoaded', () => {
     // Monitor Firebase connection
-    try {
-        monitorFirebaseConnection();
-    } catch (error) {
-        console.error('Firebase Realtime Database not initialized:', error);
-        firebaseIndicator.classList.add('disconnected');
-        firebaseStatusText.textContent = 'Firebase connection issue';
-    }
+    monitorFirebaseConnection();
+    
+    // Fetch admin password from Firebase
+    fetchAdminPassword();
     
     // Set current date/time in form when admin panel is opened
     adminBtn.addEventListener('click', () => {
@@ -96,26 +149,29 @@ loginForm.addEventListener('submit', e => {
     
     const password = document.getElementById('password').value;
     
-    if (password === ADMIN_PASSWORD) {
-        // Set logged in state
-        isAdminLoggedIn = true;
-        localStorage.setItem('isAdminLoggedIn', 'true');
-        
-        // Show admin panel
-        loginSection.classList.add('hidden');
-        countdownManagement.classList.remove('hidden');
-        
-        // Set current date/time
-        setCurrentDateTime();
-        
-        // Load admin countdowns
-        loadAdminCountdowns();
-        
-        // Clear form
-        loginForm.reset();
-    } else {
-        alert('Incorrect password');
-    }
+    // First ensure we have the latest password from Firebase
+    fetchAdminPassword().then(() => {
+        if (password === adminPassword) {
+            // Set logged in state
+            isAdminLoggedIn = true;
+            localStorage.setItem('isAdminLoggedIn', 'true');
+            
+            // Show admin panel
+            loginSection.classList.add('hidden');
+            countdownManagement.classList.remove('hidden');
+            
+            // Set current date/time
+            setCurrentDateTime();
+            
+            // Load admin countdowns
+            loadAdminCountdowns();
+            
+            // Clear form
+            loginForm.reset();
+        } else {
+            alert('Incorrect password');
+        }
+    });
 });
 
 // Logout function
