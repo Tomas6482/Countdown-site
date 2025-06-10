@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Countdown Hub</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Countdown Hub</h1>
+        <nav>
+            <button id="all-btn" class="active">All</button>
+            <button id="holidays-btn">Holidays</button>
+            <button id="games-btn">Game Events</button>
+            <button id="admin-btn">Admin</button>
+        </nav>
+    </header>
+
+    <main>
+        <div id="countdowns" class="countdown-container">
+            <!-- Countdowns will be dynamically added here -->
+            <div class="loading">Loading countdowns...</div>
+        </div>
+
+        <div id="admin-panel" class="hidden">
+            <div id="login-section">
+                <h2>Admin Login</h2>
+                <form id="login-form">
+                    <input type="password" id="password" placeholder="Admin Password" required>
+                    <button type="submit">Login</button>
+                </form>
+            </div>
+
+            <div id="countdown-management" class="hidden">
+                <h2>Manage Countdowns</h2>
+                <form id="countdown-form">
+                    <input type="text" id="event-name" placeholder="Event Name" required>
+                    <input type="datetime-local" id="event-date" required>
+                    <select id="event-category" required>
+                        <option value="">Select Category</option>
+                        <option value="holidays">Holiday</option>
+                        <option value="games">Game Event</option>
+                    </select>
+                    <select id="event-repeat" required>
+                        <option value="none">No Repeat</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                    <input type="color" id="event-color" value="#4287f5">
+                    <button type="submit">Add Countdown</button>
+                </form>
+
+                <div id="countdown-list">
+                    <h3>Current Countdowns</h3>
+                    <ul id="admin-countdown-list">
+                        <!-- List of existing countdowns to edit/delete -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>Countdown Hub</p>
+    </footer>
+
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html> 
