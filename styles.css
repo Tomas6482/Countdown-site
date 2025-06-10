@@ -279,6 +279,13 @@ main {
     color: #555;
 }
 
+.help-text {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.2rem;
+    font-style: italic;
+}
+
 input, select {
     padding: 0.9rem;
     border: 1px solid #ddd;

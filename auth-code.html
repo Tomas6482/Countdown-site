@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Auth Code</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .code-container {
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        h1 {
+            color: #2a2a72;
+            margin-bottom: 1.5rem;
+        }
+        .auth-code {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #4287f5;
+            letter-spacing: 4px;
+            margin: 1.5rem 0;
+            font-family: monospace;
+        }
+        .expires {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1.5rem;
+        }
+        .countdown {
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .note {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 1.5rem;
+            font-style: italic;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 1.5rem;
+            text-decoration: none;
+            color: #4287f5;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="code-container">
+        <h1>Admin Authentication Code</h1>
+        <div id="loading">Loading authentication code...</div>
+        <div id="code-display" style="display: none;">
+            <div class="auth-code" id="auth-code">------</div>
+            <div class="expires">
+                Expires in <span class="countdown" id="countdown">60</span> seconds
+            </div>
+        </div>
+        <p class="note">This code changes every minute and is required to access the admin panel.</p>
+        <a href="index.html" class="back-link">← Back to Countdown Hub</a>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script>
+        // Get DOM elements
+        const loadingElement = document.getElementById('loading');
+        const codeDisplayElement = document.getElementById('code-display');
+        const authCodeElement = document.getElementById('auth-code');
+        const countdownElement = document.getElementById('countdown');
+
+        // Function to get the current auth code
+        function getAuthCode() {
+            return db.collection('admin').doc('auth').get()
+                .then(doc => {
+                    if (doc.exists && doc.data().code) {
+                        const code = doc.data().code;
+                        const expires = doc.data().expires.toDate();
+                        return { code, expires };
+                    }
+                    return null;
+                })
+                .catch(error => {
+                    console.error('Error fetching auth code:', error);
+                    return null;
+                });
+        }
+
+        // Function to update the UI with the current code
+        function updateCodeDisplay() {
+            getAuthCode().then(result => {
+                if (result && result.code) {
+                    // Show the code
+                    authCodeElement.textContent = result.code;
+                    
+                    // Calculate and show expiration countdown
+                    const now = new Date();
+                    const expiresIn = Math.max(0, Math.floor((result.expires - now) / 1000));
+                    countdownElement.textContent = expiresIn;
+                    
+                    // Hide loading, show code
+                    loadingElement.style.display = 'none';
+                    codeDisplayElement.style.display = 'block';
+                    
+                    // Update countdown every second
+                    let countdownInterval = setInterval(() => {
+                        const newExpiresIn = Math.max(0, parseInt(countdownElement.textContent) - 1);
+                        countdownElement.textContent = newExpiresIn;
+                        
+                        if (newExpiresIn <= 0) {
+                            clearInterval(countdownInterval);
+                            // Refresh to get the new code
+                            setTimeout(updateCodeDisplay, 1000);
+                        }
+                    }, 1000);
+                } else {
+                    loadingElement.textContent = 'Error loading authentication code. Please refresh the page.';
+                }
+            });
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', updateCodeDisplay);
+    </script>
+</body>
+</html> 

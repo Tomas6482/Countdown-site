@@ -25,6 +25,90 @@ let isAdminLoggedIn = false;
 const DEFAULT_PASSWORD = "admin123";
 let adminPassword = DEFAULT_PASSWORD;
 
+// Generate a time-based authentication code
+function generateAuthCode() {
+    // Get current date/time
+    const now = new Date();
+    
+    // Use the current date as seed for the auth code
+    // This will change every minute
+    const seed = `${now.getFullYear()}${now.getMonth()}${now.getDate()}${now.getHours()}${now.getMinutes()}`;
+    
+    // Create a simple hash of the seed
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+        const char = seed.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    // Convert to a 6-digit positive number
+    const authCode = Math.abs(hash % 1000000).toString().padStart(6, '0');
+    
+    return authCode;
+}
+
+// Store the current auth code in Firebase
+function updateAuthCode() {
+    const authCode = generateAuthCode();
+    return db.collection('admin').doc('auth').set({
+        code: authCode,
+        expires: firebase.firestore.Timestamp.fromDate(
+            new Date(Math.ceil(Date.now() / 60000) * 60000) // Next minute
+        )
+    })
+    .then(() => {
+        console.log('Auth code updated in Firebase');
+        return authCode;
+    })
+    .catch(error => {
+        console.error('Error updating auth code:', error);
+        return null;
+    });
+}
+
+// Get the current auth code from Firebase
+function getAuthCode() {
+    return db.collection('admin').doc('auth').get()
+        .then(doc => {
+            if (doc.exists && doc.data().code) {
+                // Check if the code is still valid
+                const expires = doc.data().expires.toDate();
+                if (expires > new Date()) {
+                    return doc.data().code;
+                }
+            }
+            
+            // If no valid code exists, generate a new one
+            return updateAuthCode();
+        })
+        .catch(error => {
+            console.error('Error fetching auth code:', error);
+            return null;
+        });
+}
+
+// Start the auth code update interval
+let authCodeInterval = null;
+
+function startAuthCodeUpdates() {
+    // Update auth code immediately
+    updateAuthCode();
+    
+    // Calculate time until the next minute
+    const now = new Date();
+    const nextMinute = new Date(Math.ceil(now.getTime() / 60000) * 60000);
+    const timeUntilNextMinute = nextMinute - now;
+    
+    // Schedule first update at the next minute
+    setTimeout(() => {
+        updateAuthCode();
+        
+        // Then update every minute
+        authCodeInterval = setInterval(updateAuthCode, 60000);
+    }, timeUntilNextMinute);
+}
+
 // Fetch the admin password from Firebase
 function fetchAdminPassword() {
     return db.collection('admin').doc('settings').get()
@@ -120,6 +204,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Fetch admin password from Firebase
     fetchAdminPassword();
     
+    // Start auth code updates
+    startAuthCodeUpdates();
+    
     // Set current date/time in form when admin panel is opened
     adminBtn.addEventListener('click', () => {
         setCurrentDateTime();
@@ -148,30 +235,38 @@ loginForm.addEventListener('submit', e => {
     e.preventDefault();
     
     const password = document.getElementById('password').value;
+    const authCode = document.getElementById('auth-code').value;
     
-    // First ensure we have the latest password from Firebase
-    fetchAdminPassword().then(() => {
-        if (password === adminPassword) {
-            // Set logged in state
-            isAdminLoggedIn = true;
-            localStorage.setItem('isAdminLoggedIn', 'true');
-            
-            // Show admin panel
-            loginSection.classList.add('hidden');
-            countdownManagement.classList.remove('hidden');
-            
-            // Set current date/time
-            setCurrentDateTime();
-            
-            // Load admin countdowns
-            loadAdminCountdowns();
-            
-            // Clear form
-            loginForm.reset();
-        } else {
-            alert('Incorrect password');
-        }
-    });
+    // Verify both password and auth code
+    Promise.all([fetchAdminPassword(), getAuthCode()])
+        .then(([passwordSuccess, currentAuthCode]) => {
+            if (password === adminPassword && authCode === currentAuthCode) {
+                // Set logged in state
+                isAdminLoggedIn = true;
+                localStorage.setItem('isAdminLoggedIn', 'true');
+                
+                // Show admin panel
+                loginSection.classList.add('hidden');
+                countdownManagement.classList.remove('hidden');
+                
+                // Set current date/time
+                setCurrentDateTime();
+                
+                // Load admin countdowns
+                loadAdminCountdowns();
+                
+                // Clear form
+                loginForm.reset();
+            } else if (password !== adminPassword) {
+                alert('Incorrect password');
+            } else {
+                alert('Incorrect authentication code');
+            }
+        })
+        .catch(error => {
+            console.error('Login verification error:', error);
+            alert('Error during login. Please try again.');
+        });
 });
 
 // Logout function
