@@ -850,6 +850,9 @@ function createCountdownElement(id, countdown) {
     const day = targetDateTime.getDate();
     const isSummerBreak = (month === 6 || month === 7) || (month === 5 && day >= 24); // July, August, or after June 23
     
+    // Show school days for "Summer Holiday Start" event even during summer break
+    const shouldShowSchoolDays = !isSummerBreak || countdown.name.includes("Summer Holiday Start");
+    
     countdownCard.innerHTML = `
         <span class="countdown-category">${categoryLabel}</span>
         <h2 class="countdown-title">${countdown.name}</h2>
@@ -880,7 +883,7 @@ function createCountdownElement(id, countdown) {
             minute: '2-digit'
         })}</div>
         ${repeatLabel ? `<div class="countdown-recurring">${repeatLabel}</div>` : ''}
-        ${!isSummerBreak ? `
+        ${shouldShowSchoolDays ? `
         <button class="school-info-toggle">Show School Days</button>
         <div class="school-info-panel hidden">
             <div class="school-info-item">
